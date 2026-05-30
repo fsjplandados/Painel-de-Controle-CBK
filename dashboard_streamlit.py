@@ -139,8 +139,17 @@ def load_data():
             df['Data_Real'] = pd.to_datetime(df['Data de lançamento'], errors='coerce')
             df['Data_MesAno'] = df['Data_Real'].dt.to_period('M').astype(str)
         else:
-            df['Data_Real'] = pd.NaT
+            df['Data_Real'] = pd.to_datetime('2026-01-01')
             df['Data_MesAno'] = 'Desconhecido'
+
+        # Calcular a Data da Venda Original (Mês de Referência)
+        col_doc = 'Data do documento' if 'Data do documento' in df.columns else 'Data de lançamento'
+        df['Data_Venda'] = pd.to_datetime(df.get('adyen_payment_date'), errors='coerce').combine_first(
+            pd.to_datetime(df.get('cs_data_finalizacao'), errors='coerce')
+        ).combine_first(
+            pd.to_datetime(df.get(col_doc), errors='coerce')
+        )
+        df['Data_Venda_MesAno'] = df['Data_Venda'].dt.to_period('M').astype(str)
             
         df['Valor_Float'] = pd.to_numeric(df['Valor/MR'].fillna(0), errors='coerce').fillna(0)
         
@@ -356,18 +365,37 @@ def apply_premium_layout(fig):
     fig.update_yaxes(showgrid=True, gridcolor='#1E293B', zeroline=False)
     return fig
 
-# ─── Linha 1: Gráfico de Evolução (Largura Total) ─────────────────────────────
-st.subheader("📈 Evolução Temporal dos Impactos Financeiros", help="Mostra como o volume financeiro de chargebacks e desacordos comerciais flutuou ao longo dos meses.")
-df_evol = df.groupby(['Data_MesAno', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
-if not df_evol.empty:
-    fig_evol = px.bar(df_evol, x='Data_MesAno', y='Valor_Float', color='Tipo de Chargeback',
-                      color_discrete_map=COLORS, barmode='group')
-    fig_evol.update_traces(hovertemplate='%{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
-    fig_evol = apply_premium_layout(fig_evol)
-    fig_evol.update_layout(xaxis_title="", yaxis_title="")
-    st.plotly_chart(fig_evol, use_container_width=True, config={'displayModeBar': False})
-else:
-    st.info("Sem dados para o período selecionado.")
+# ─── Linha 1: Gráficos de Evolução (Lançamento vs Venda) ─────────────────────────────
+col_evol1, col_evol2 = st.columns(2)
+
+with col_evol1:
+    st.subheader("📈 Evolução por Mês de Lançamento (SAP)", help="Mostra o impacto financeiro no mês em que o chargeback ou estorno foi contabilizado no SAP.")
+    df_evol = df.groupby(['Data_MesAno', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
+    if not df_evol.empty:
+        fig_evol = px.bar(df_evol, x='Data_MesAno', y='Valor_Float', color='Tipo de Chargeback',
+                          color_discrete_map=COLORS, barmode='group')
+        fig_evol.update_traces(hovertemplate='Lançamento: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
+        fig_evol = apply_premium_layout(fig_evol)
+        fig_evol.update_xaxes(type='category')
+        fig_evol.update_layout(xaxis_title="", yaxis_title="")
+        st.plotly_chart(fig_evol, use_container_width=True, config={'displayModeBar': False})
+    else:
+        st.info("Sem dados para o período selecionado.")
+
+with col_evol2:
+    st.subheader("🛒 Origem: Mês de Referência da Venda", help="Mostra os mesmos chargebacks do período filtrado, mas reposicionados no mês em que a Venda Original (Pedido) ocorreu.")
+    df_venda = df.groupby(['Data_Venda_MesAno', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
+    if not df_venda.empty:
+        df_venda = df_venda.sort_values('Data_Venda_MesAno')
+        fig_venda = px.bar(df_venda, x='Data_Venda_MesAno', y='Valor_Float', color='Tipo de Chargeback',
+                           color_discrete_map=COLORS, barmode='group')
+        fig_venda.update_traces(hovertemplate='Venda Origem: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
+        fig_venda = apply_premium_layout(fig_venda)
+        fig_venda.update_xaxes(type='category')
+        fig_venda.update_layout(xaxis_title="", yaxis_title="")
+        st.plotly_chart(fig_venda, use_container_width=True, config={'displayModeBar': False})
+    else:
+        st.info("Sem dados de venda na origem.")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
