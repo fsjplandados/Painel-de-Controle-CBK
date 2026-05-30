@@ -13,13 +13,9 @@ __pycache__/
 *$py.class
 *.so
 
-# Arquivos de Dados (Evitar subir as bases reais de chargeback do SAP para o Github/Deploy)
-*.xlsx
-*.csv
+# Arquivos de Dados (Liberado para repo privado)
+# Se necessário, você pode ignorar outros arquivos grandes aqui
 *.json
-relatorio_chargeback_consolidado_novo.xlsx
-*consolida*.xlsx
-*chargeback*.xlsx
 
 # Configurações Locais do Streamlit
 .streamlit/credentials.toml
