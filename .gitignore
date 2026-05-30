@@ -1,0 +1,30 @@
+# Ambientes Virtuais
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Arquivos do Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Arquivos de Dados (Evitar subir as bases reais de chargeback do SAP para o Github/Deploy)
+*.xlsx
+*.csv
+*.json
+relatorio_chargeback_consolidado_novo.xlsx
+*consolida*.xlsx
+*chargeback*.xlsx
+
+# Configurações Locais do Streamlit
+.streamlit/credentials.toml
+
+# Logs e arquivos do SO
+*.log
+.DS_Store
+Thumbs.db
