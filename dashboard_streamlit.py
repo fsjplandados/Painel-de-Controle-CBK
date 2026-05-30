@@ -227,12 +227,12 @@ with col_header1:
     st.markdown("<h4 style='color: #EC4899; font-weight: 600; margin-bottom: 0.5rem;'>Filtros de Análise</h4>", unsafe_allow_html=True)
 with col_header2:
     if st.button("🧹 Limpar Filtros", use_container_width=True):
-        for key in ['filtro_data', 'filtro_adyen', 'filtro_cat_adyen', 'filtro_sap']:
+        for key in ['filtro_data', 'filtro_adyen', 'filtro_cat_adyen', 'filtro_sap', 'filtro_entrega']:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()
 
-col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
 
 with col_f1:
     min_date = df_raw['Data_Real'].min() if not df_raw['Data_Real'].isna().all() else datetime(2025, 1, 1)
@@ -243,6 +243,7 @@ with col_f1:
         value=(min_date.date(), max_date.date()),
         min_value=min_date.date(),
         max_value=max_date.date(),
+        format="DD/MM/YYYY",
         key='filtro_data'
     )
 
@@ -268,11 +269,20 @@ with col_f4:
     categorias_sap = sorted(df_raw['Categoria SAP'].unique())
     default_sap = ['Chargeback'] if 'Chargeback' in categorias_sap else None
     cat_sap_selecionada = st.multiselect(
-        "📑 Denominação SAP:", 
+        "📑 SAP:", 
         options=categorias_sap,
         default=default_sap,
         placeholder="Todas (Clique para filtrar)",
         key='filtro_sap'
+    )
+
+with col_f5:
+    formas_entrega = sorted([x for x in df_raw['vtex_forma_entrega'].unique() if x != 'Sem Registro' and pd.notna(x)])
+    entrega_selecionada = st.multiselect(
+        "🚚 Forma de Entrega:", 
+        options=formas_entrega,
+        placeholder="Todas",
+        key='filtro_entrega'
     )
 
 # Validação do date_range
@@ -282,14 +292,17 @@ else:
     start_date, end_date = min_date.date(), max_date.date()
 
 # Aplicação dos Filtros
-mask_date = (df_raw['Data_Real'].dt.date >= start_date) & (df_raw['Data_Real'].dt.date <= end_date) if not df_raw['Data_Real'].isna().all() else True
-
 df = df_raw[
-    mask_date &
-    (df_raw['adyen_record_type'].isin(tipo_selecionado if tipo_selecionado else tipos_adyen)) &
-    (df_raw['Tipo de Chargeback'].isin(tipo_cb_selecionado if tipo_cb_selecionado else tipos_cb)) &
-    (df_raw['Categoria SAP'].isin(cat_sap_selecionada if cat_sap_selecionada else categorias_sap))
+    (df_raw['Data_Real'].dt.date >= start_date) & (df_raw['Data_Real'].dt.date <= end_date)
 ]
+if tipo_selecionado:
+    df = df[df['adyen_record_type'].isin(tipo_selecionado)]
+if tipo_cb_selecionado:
+    df = df[df['Tipo de Chargeback'].isin(tipo_cb_selecionado)]
+if cat_sap_selecionada:
+    df = df[df['Categoria SAP'].isin(cat_sap_selecionada)]
+if entrega_selecionada:
+    df = df[df['vtex_forma_entrega'].isin(entrega_selecionada)]
 
 # Helpers de Formatação
 def fmt_currency(val):
@@ -425,11 +438,11 @@ with col_comp2:
     df_sap_comp = df.groupby('Categoria SAP')['Valor_Float'].sum().reset_index()
     if not df_sap_comp.empty:
         df_sap_comp['Valor_Abs'] = df_sap_comp['Valor_Float'].abs()
-        fig_sap = px.pie(df_sap_comp, values='Valor_Abs', names='Categoria SAP', hole=0.7, custom_data=['Valor_Float'])
+        fig_sap = px.pie(df_sap_comp, values='Valor_Abs', names='Categoria SAP', hole=0.7)
         fig_sap.update_traces(
             textposition='inside', 
             textinfo='percent',
-            hovertemplate='%{label}<br>R$ %{customdata[0]:,.2f}<extra></extra>',
+            hovertemplate='%{label}<br>R$ %{value:,.2f}<extra></extra>',
             marker=dict(line=dict(color='#0F172A', width=3))
         )
         fig_sap = apply_premium_layout(fig_sap)
@@ -447,24 +460,17 @@ with col_prod:
     st.subheader("📦 Top 10 Produtos com Maior Índice", help="Lista os produtos da VTEX que mais sofrem contestações de pagamento, indicando potenciais alvos prediletos de fraudadores.")
     st.markdown("<span style='color: #64748B; font-weight: 500; font-size: 0.85rem;'>Produtos extraídos via API VTEX</span>", unsafe_allow_html=True)
     
-    df_prod = df.groupby(['vtex_tipo_produto', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
-    df_prod = df_prod[df_prod['vtex_tipo_produto'] != 'Sem Registro']
-    
+    df_prod = df.groupby(['vtex_tipo_produto'])['Valor_Float'].sum().reset_index()
     if not df_prod.empty:
-        prod_totals = df_prod.groupby('vtex_tipo_produto')['Valor_Float'].sum().nlargest(10).index
-        df_prod = df_prod[df_prod['vtex_tipo_produto'].isin(prod_totals)]
+        df_prod = df_prod[df_prod['vtex_tipo_produto'] != 'Sem Registro']
+        df_prod = df_prod.sort_values('Valor_Float', ascending=False).head(10).sort_values('Valor_Float', ascending=True)
         
-        # Limpar o nome do produto para não ficar gigante no eixo Y
-        df_prod['Produto Curto'] = df_prod['vtex_tipo_produto'].apply(lambda x: (str(x)[:45] + '...') if len(str(x)) > 45 else x)
+        df_prod['Produto_Curto'] = df_prod['vtex_tipo_produto'].apply(lambda x: (x[:25] + '...') if isinstance(x, str) and len(x) > 25 else x)
         
-        fig_prod = px.bar(df_prod, x='Valor_Float', y='Produto Curto', color='Tipo de Chargeback',
-                          color_discrete_map=COLORS, orientation='h')
-        
-        fig_prod.update_traces(hovertemplate='Valor: R$ %{x:,.2f}<br>Produto: %{customdata}<extra></extra>', customdata=df_prod['vtex_tipo_produto'])
+        fig_prod = px.bar(df_prod, x='Valor_Float', y='Produto_Curto', orientation='h', color_discrete_sequence=['#818cf8'])
+        fig_prod.update_traces(texttemplate='R$ %{x:,.0f}', textposition='outside', hovertemplate='Valor: R$ %{x:,.2f}<extra></extra>')
         fig_prod = apply_premium_layout(fig_prod)
-        fig_prod.update_layout(xaxis_title="", yaxis_title="", yaxis={'categoryorder':'total ascending'})
-        fig_prod.update_yaxes(showgrid=False)
-        fig_prod.update_xaxes(showgrid=True, gridcolor='#1E293B')
+        fig_prod.update_layout(xaxis_title="", yaxis_title="", margin=dict(r=50))
         st.plotly_chart(fig_prod, use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("Nenhum produto rastreado no período selecionado.")
@@ -473,19 +479,13 @@ with col_motivo:
     st.subheader("⚠️ Top 10 Razões Declaradas (Banco)", help="Lista os códigos/motivos técnicos enviados pelos bancos emissores via Adyen que justificaram o cancelamento.")
     st.markdown("<span style='color: #64748B; font-weight: 500; font-size: 0.85rem;'>Motivos reportados pelo emissor na Adyen</span>", unsafe_allow_html=True)
     
-    df_motivo = df.groupby(['adyen_dispute_reason', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
+    df_motivo = df.groupby(['adyen_dispute_reason'])['Valor_Float'].sum().reset_index()
     if not df_motivo.empty:
-        motivos_top = df_motivo.groupby('adyen_dispute_reason')['Valor_Float'].sum().nlargest(10).index
-        df_motivo = df_motivo[df_motivo['adyen_dispute_reason'].isin(motivos_top)]
-        
-        fig_motivo = px.bar(df_motivo, x='Valor_Float', y='adyen_dispute_reason', color='Tipo de Chargeback',
-                          color_discrete_map=COLORS, orientation='h')
-        
-        fig_motivo.update_traces(hovertemplate='Valor: R$ %{x:,.2f}<extra></extra>')
+        df_motivo = df_motivo.sort_values('Valor_Float', ascending=False).head(10).sort_values('Valor_Float', ascending=True)
+        fig_motivo = px.bar(df_motivo, x='Valor_Float', y='adyen_dispute_reason', orientation='h', color_discrete_sequence=['#EC4899'])
+        fig_motivo.update_traces(texttemplate='R$ %{x:,.0f}', textposition='outside', hovertemplate='Valor: R$ %{x:,.2f}<extra></extra>')
         fig_motivo = apply_premium_layout(fig_motivo)
-        fig_motivo.update_layout(xaxis_title="", yaxis_title="", yaxis={'categoryorder':'total ascending'})
-        fig_motivo.update_yaxes(showgrid=False)
-        fig_motivo.update_xaxes(showgrid=True, gridcolor='#1E293B')
+        fig_motivo.update_layout(xaxis_title="", yaxis_title="", margin=dict(r=50))
         st.plotly_chart(fig_motivo, use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("Sem dados de motivos Adyen.")
@@ -497,30 +497,24 @@ col_uf, col_entrega = st.columns(2)
 
 with col_uf:
     st.subheader("📍 Concentração de Perdas (UF)", help="Mapeia os estados do Brasil que concentram o maior volume financeiro de chargebacks, baseado na UF de entrega/faturamento da VTEX.")
-    df_uf = df.groupby(['vtex_uf', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
+    df_uf = df.groupby(['vtex_uf'])['Valor_Float'].sum().reset_index()
     df_uf = df_uf[df_uf['vtex_uf'] != 'NC']
     if not df_uf.empty:
-        uf_totals = df_uf.groupby('vtex_uf')['Valor_Float'].sum().nlargest(10).index
-        df_uf = df_uf[df_uf['vtex_uf'].isin(uf_totals)]
-        
-        fig_uf = px.bar(df_uf, x='vtex_uf', y='Valor_Float', color='Tipo de Chargeback',
-                        color_discrete_map=COLORS)
-        
-        fig_uf.update_traces(hovertemplate='Estado: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
+        df_uf = df_uf.sort_values('Valor_Float', ascending=False).head(10)
+        fig_uf = px.bar(df_uf, x='vtex_uf', y='Valor_Float', color_discrete_sequence=['#10B981'])
+        fig_uf.update_traces(texttemplate='R$ %{y:,.0f}', textposition='outside', hovertemplate='Valor: R$ %{y:,.2f}<extra></extra>')
         fig_uf = apply_premium_layout(fig_uf)
-        fig_uf.update_layout(xaxis_title="", yaxis_title="", xaxis={'categoryorder':'total descending'})
+        fig_uf.update_layout(xaxis_title="", yaxis_title="", margin=dict(t=30))
         st.plotly_chart(fig_uf, use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("Sem dados de estado.")
 
 with col_entrega:
     st.subheader("🚚 Risco por Modalidade de Entrega", help="Cruza as informações logísticas para mostrar o percentual de ocorrências em entregas domiciliares versus retiradas em loja física.")
-    df_entrega = df.groupby(['vtex_forma_entrega', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
+    df_entrega = df.groupby(['vtex_forma_entrega'])['Valor_Float'].sum().reset_index()
     df_entrega = df_entrega[df_entrega['vtex_forma_entrega'] != 'Sem Registro']
     
     if not df_entrega.empty:
-        fig_entrega = px.bar(df_entrega, y='vtex_forma_entrega', x='Valor_Float', color='Tipo de Chargeback',
-                             color_discrete_map=COLORS, orientation='h')
         
         fig_entrega.update_traces(hovertemplate='Valor: R$ %{x:,.2f}<extra></extra>')
         fig_entrega = apply_premium_layout(fig_entrega)
