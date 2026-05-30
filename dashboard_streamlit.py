@@ -515,12 +515,52 @@ with col_entrega:
     df_entrega = df_entrega[df_entrega['vtex_forma_entrega'] != 'Sem Registro']
     
     if not df_entrega.empty:
-        
-        fig_entrega.update_traces(hovertemplate='Valor: R$ %{x:,.2f}<extra></extra>')
+        df_entrega = df_entrega.sort_values('Valor_Float', ascending=True)
+        fig_entrega = px.bar(df_entrega, x='Valor_Float', y='vtex_forma_entrega', orientation='h', color_discrete_sequence=['#F59E0B'])
+        fig_entrega.update_traces(texttemplate='R$ %{x:,.0f}', textposition='outside', hovertemplate='Valor: R$ %{x:,.2f}<extra></extra>')
         fig_entrega = apply_premium_layout(fig_entrega)
-        fig_entrega.update_layout(xaxis_title="", yaxis_title="", yaxis={'categoryorder':'total ascending'})
-        fig_entrega.update_yaxes(showgrid=False)
-        fig_entrega.update_xaxes(showgrid=True, gridcolor='#1E293B')
+        fig_entrega.update_layout(xaxis_title="", yaxis_title="", margin=dict(r=50))
         st.plotly_chart(fig_entrega, use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("Sem dados de entrega.")
+
+st.markdown("<br><hr style='border-color: #334155;'>", unsafe_allow_html=True)
+
+# ─── Linha 5: Tabela de Dados Brutos ──────────────────────────────────────────
+st.subheader("📋 Detalhamento dos Pedidos Contestados", help="Tabela com o detalhamento das transações que compõem o filtro atual. Útil para auditoria pontual de pedidos e valores.")
+
+# Format columns for display
+cols_disponiveis = df.columns.tolist()
+cols_exibir = []
+
+# Tenta exibir essas colunas principais, se existirem
+preferencias = [
+    ('Data_Real', 'Lançamento SAP'),
+    ('Data_Venda', 'Data da Venda'),
+    ('adyen_vtex_order_id', 'Pedido VTEX'),
+    ('Categoria SAP', 'Contábil SAP'),
+    ('Tipo de Chargeback', 'Classificação Analítica'),
+    ('Valor_Float', 'Valor em R$'),
+    ('vtex_tipo_produto', 'Tipo de Produto'),
+    ('adyen_dispute_reason', 'Motivo Adyen')
+]
+
+col_map = {}
+for col, rename in preferencias:
+    if col in cols_disponiveis:
+        cols_exibir.append(col)
+        col_map[col] = rename
+
+if cols_exibir:
+    df_table = df[cols_exibir].copy()
+    
+    # Formata as datas para não ficarem com horas se não precisar
+    if 'Data_Real' in df_table.columns:
+        df_table['Data_Real'] = df_table['Data_Real'].dt.strftime('%Y-%m-%d')
+    if 'Data_Venda' in df_table.columns:
+        df_table['Data_Venda'] = df_table['Data_Venda'].dt.strftime('%Y-%m-%d')
+        
+    df_table = df_table.rename(columns=col_map)
+    st.dataframe(df_table, use_container_width=True, hide_index=True)
+else:
+    st.info("Tabela de dados não disponível com as colunas atuais.")
