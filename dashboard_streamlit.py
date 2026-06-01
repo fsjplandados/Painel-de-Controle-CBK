@@ -132,7 +132,7 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_excel('relatorio_chargeback_consolidado.xlsx', sheet_name='Consolidado Completo')
+        df = pd.read_excel('relatorio_chargeback_consolidado.xlsx', sheet_name='Consolidado Completo', engine='calamine')
         
         # Filtro de Data Preciso
         if 'Data de lançamento' in df.columns:
