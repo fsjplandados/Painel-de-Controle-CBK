@@ -386,7 +386,7 @@ with col_evol1:
     df_evol = df.groupby(['Data_MesAno', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
     if not df_evol.empty:
         fig_evol = px.bar(df_evol, x='Data_MesAno', y='Valor_Float', color='Tipo de Chargeback',
-                          color_discrete_map=COLORS, barmode='group')
+                          color_discrete_map=COLORS, barmode='stack')
         fig_evol.update_traces(hovertemplate='Lançamento: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
         fig_evol = apply_premium_layout(fig_evol)
         fig_evol.update_xaxes(type='category')
@@ -401,7 +401,7 @@ with col_evol2:
     if not df_venda.empty:
         df_venda = df_venda.sort_values('Data_Venda_MesAno')
         fig_venda = px.bar(df_venda, x='Data_Venda_MesAno', y='Valor_Float', color='Tipo de Chargeback',
-                           color_discrete_map=COLORS, barmode='group')
+                           color_discrete_map=COLORS, barmode='stack')
         fig_venda.update_traces(hovertemplate='Venda Origem: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
         fig_venda = apply_premium_layout(fig_venda)
         fig_venda.update_xaxes(type='category')
