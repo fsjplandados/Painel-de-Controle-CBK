@@ -132,7 +132,7 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_excel('relatorio_chargeback_consolidado_novo.xlsx', sheet_name='Consolidado Completo')
+        df = pd.read_excel('relatorio_chargeback_consolidado.xlsx', sheet_name='Consolidado Completo')
         
         # Filtro de Data Preciso
         if 'Data de lançamento' in df.columns:
@@ -214,7 +214,7 @@ def load_data():
 df_raw = load_data()
 
 if df_raw.empty:
-    st.warning("O arquivo `relatorio_chargeback_consolidado_novo.xlsx` não foi encontrado ou está vazio.")
+    st.warning("O arquivo `relatorio_chargeback_consolidado.xlsx` não foi encontrado ou está vazio.")
     st.stop()
 
 # ─── Header e Título ──────────────────────────────────────────────
@@ -308,6 +308,9 @@ if entrega_selecionada:
 def fmt_currency(val):
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+def fmt_currency_int(val):
+    return f"R$ {val:,.0f}".replace(",", ".")
+
 def fmt_number(val):
     return f"{val:,}".replace(",", ".")
 
@@ -326,7 +329,7 @@ kpi_html = f"""
             Volume Bruto Afetado
             <div class="kpi-tooltip">❔<span class="kpi-tooltiptext">Valor total bruto das transações que sofreram alguma disputa no período selecionado.</span></div>
         </div>
-        <div class="kpi-value text-indigo">{fmt_currency(total_valor)}</div>
+        <div class="kpi-value text-indigo">{fmt_currency_int(total_valor)}</div>
         <div class="kpi-subtitle">Total de {fmt_number(total_registros)} transações</div>
     </div>
     <div class="kpi-card">
@@ -334,7 +337,7 @@ kpi_html = f"""
             Prejuízo por Fraude
             <div class="kpi-tooltip">❔<span class="kpi-tooltiptext">Soma financeira perdida confirmada por transações não reconhecidas (cartão clonado, fraude, etc).</span></div>
         </div>
-        <div class="kpi-value text-pink">{fmt_currency(fraude_valor)}</div>
+        <div class="kpi-value text-pink">{fmt_currency_int(fraude_valor)}</div>
         <div class="kpi-subtitle">Perda por cartões roubados</div>
     </div>
     <div class="kpi-card">
@@ -342,7 +345,7 @@ kpi_html = f"""
             Desacordo Comercial
             <div class="kpi-tooltip">❔<span class="kpi-tooltiptext">Valores em disputa devido a devoluções, problemas operacionais ou mercadorias danificadas.</span></div>
         </div>
-        <div class="kpi-value text-emerald">{fmt_currency(comercial_valor)}</div>
+        <div class="kpi-value text-emerald">{fmt_currency_int(comercial_valor)}</div>
         <div class="kpi-subtitle">Processos adm. e devoluções</div>
     </div>
     <div class="kpi-card">
@@ -383,10 +386,10 @@ col_evol1, col_evol2 = st.columns(2)
 
 with col_evol1:
     st.subheader("📈 Evolução por Mês de Lançamento (SAP)", help="Mostra o impacto financeiro no mês em que o chargeback ou estorno foi contabilizado no SAP.")
-    df_evol = df.groupby(['Data_MesAno', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
+    df_evol = df.groupby(['Data_MesAno'])['Valor_Float'].sum().reset_index()
     if not df_evol.empty:
-        fig_evol = px.bar(df_evol, x='Data_MesAno', y='Valor_Float', color='Tipo de Chargeback',
-                          color_discrete_map=COLORS, barmode='stack')
+        fig_evol = px.bar(df_evol, x='Data_MesAno', y='Valor_Float',
+                          color_discrete_sequence=['#818CF8'])
         fig_evol.update_traces(hovertemplate='Lançamento: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
         fig_evol = apply_premium_layout(fig_evol)
         fig_evol.update_xaxes(type='category')
@@ -397,11 +400,11 @@ with col_evol1:
 
 with col_evol2:
     st.subheader("🛒 Origem: Mês de Referência da Venda", help="Mostra os mesmos chargebacks do período filtrado, mas reposicionados no mês em que a Venda Original (Pedido) ocorreu.")
-    df_venda = df.groupby(['Data_Venda_MesAno', 'Tipo de Chargeback'])['Valor_Float'].sum().reset_index()
+    df_venda = df.groupby(['Data_Venda_MesAno'])['Valor_Float'].sum().reset_index()
     if not df_venda.empty:
         df_venda = df_venda.sort_values('Data_Venda_MesAno')
-        fig_venda = px.bar(df_venda, x='Data_Venda_MesAno', y='Valor_Float', color='Tipo de Chargeback',
-                           color_discrete_map=COLORS, barmode='stack')
+        fig_venda = px.bar(df_venda, x='Data_Venda_MesAno', y='Valor_Float',
+                           color_discrete_sequence=['#818CF8'])
         fig_venda.update_traces(hovertemplate='Venda Origem: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
         fig_venda = apply_premium_layout(fig_venda)
         fig_venda.update_xaxes(type='category')
