@@ -463,12 +463,13 @@ with col_prod:
     st.subheader("📦 Top 10 Produtos com Maior Índice", help="Lista os produtos da VTEX que mais sofrem contestações de pagamento, indicando potenciais alvos prediletos de fraudadores.")
     st.markdown("<span style='color: #64748B; font-weight: 500; font-size: 0.85rem;'>Produtos extraídos via API VTEX</span>", unsafe_allow_html=True)
     
-    df_prod = df.groupby(['vtex_tipo_produto'])['Valor_Float'].sum().reset_index()
-    if not df_prod.empty:
-        df_prod = df_prod[df_prod['vtex_tipo_produto'] != 'Sem Registro']
-        df_prod = df_prod.sort_values('Valor_Float', ascending=False).head(10).sort_values('Valor_Float', ascending=True)
+    df_temp = df[df['vtex_tipo_produto'].notna() & (df['vtex_tipo_produto'] != 'Sem Registro')].copy()
+    if not df_temp.empty:
+        # Truncar o nome para 35 caracteres e agrupar para evitar barras empilhadas no Plotly
+        df_temp['Produto_Curto'] = df_temp['vtex_tipo_produto'].apply(lambda x: (x[:35] + '...') if isinstance(x, str) and len(x) > 35 else str(x))
+        df_prod = df_temp.groupby('Produto_Curto')['Valor_Float'].sum().reset_index()
         
-        df_prod['Produto_Curto'] = df_prod['vtex_tipo_produto'].apply(lambda x: (x[:25] + '...') if isinstance(x, str) and len(x) > 25 else x)
+        df_prod = df_prod.sort_values('Valor_Float', ascending=False).head(10).sort_values('Valor_Float', ascending=True)
         
         fig_prod = px.bar(df_prod, x='Valor_Float', y='Produto_Curto', orientation='h', color_discrete_sequence=['#818cf8'])
         fig_prod.update_traces(texttemplate='R$ %{x:,.0f}', textposition='outside', hovertemplate='Valor: R$ %{x:,.2f}<extra></extra>')
