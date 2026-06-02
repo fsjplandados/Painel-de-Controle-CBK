@@ -376,7 +376,8 @@ def apply_premium_layout(fig):
         font=dict(color='#94A3B8', family='Montserrat, sans-serif'),
         margin=dict(t=25, l=0, r=0, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
-        hoverlabel=dict(bgcolor="#1E293B", font_size=13, font_family="Montserrat, sans-serif")
+        hoverlabel=dict(bgcolor="#1E293B", font_size=13, font_family="Montserrat, sans-serif"),
+        separators=',.'
     )
     fig.update_xaxes(showgrid=False, zeroline=False, showline=True, linecolor='#334155')
     fig.update_yaxes(showgrid=True, gridcolor='#1E293B', zeroline=False)
