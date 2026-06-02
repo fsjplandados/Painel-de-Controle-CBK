@@ -198,6 +198,7 @@ def load_data():
             df['Categoria SAP'] = 'Não Identificado'
         
         # Fill NA para filtros e gráficos
+        df['vtex_loja'] = df['vtex_loja'].fillna('Sem Registro')
         df['vtex_forma_entrega'] = df['vtex_forma_entrega'].fillna('Sem Registro')
         df['vtex_cidade'] = df['vtex_cidade'].fillna('Sem Registro')
         df['vtex_uf'] = df['vtex_uf'].fillna('NC')
@@ -528,9 +529,48 @@ with col_entrega:
     else:
         st.info("Sem dados de entrega.")
 
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ─── Linha 5: Top Lojas e Top Cidades (Geográfico e Filiais) ──────────────────
+col_loja, col_cidade = st.columns(2)
+
+with col_loja:
+    st.subheader("🏪 Top 20 Lojas com Maior Índice", help="Lista as 20 lojas (VTEX) que concentram o maior volume financeiro de chargebacks.")
+    st.markdown("<span style='color: #64748B; font-weight: 500; font-size: 0.85rem;'>Volume financeiro por loja VTEX</span>", unsafe_allow_html=True)
+    
+    df_loja_temp = df[df['vtex_loja'].notna() & (df['vtex_loja'] != 'Sem Registro')].copy()
+    if not df_loja_temp.empty:
+        df_loja = df_loja_temp.groupby('vtex_loja')['Valor_Float'].sum().reset_index()
+        df_loja = df_loja.sort_values('Valor_Float', ascending=False).head(20).sort_values('Valor_Float', ascending=True)
+        
+        fig_loja = px.bar(df_loja, x='Valor_Float', y='vtex_loja', orientation='h', color_discrete_sequence=['#818cf8'])
+        fig_loja.update_traces(texttemplate='R$ %{x:,.0f}', textposition='outside', hovertemplate='Loja: %{y}<br>Valor: R$ %{x:,.2f}<extra></extra>')
+        fig_loja = apply_premium_layout(fig_loja)
+        fig_loja.update_layout(xaxis_title="", yaxis_title="", margin=dict(r=50), height=600)
+        st.plotly_chart(fig_loja, use_container_width=True, config={'displayModeBar': False})
+    else:
+        st.info("Nenhuma loja rastreada no período selecionado.")
+
+with col_cidade:
+    st.subheader("🏙️ Top 20 Cidades com Maior Índice", help="Lista as 20 cidades (VTEX) que possuem o maior impacto financeiro em contestações.")
+    st.markdown("<span style='color: #64748B; font-weight: 500; font-size: 0.85rem;'>Volume financeiro por cidade de entrega VTEX</span>", unsafe_allow_html=True)
+    
+    df_cidade_temp = df[df['vtex_cidade'].notna() & (df['vtex_cidade'] != 'Sem Registro')].copy()
+    if not df_cidade_temp.empty:
+        df_cidade = df_cidade_temp.groupby('vtex_cidade')['Valor_Float'].sum().reset_index()
+        df_cidade = df_cidade.sort_values('Valor_Float', ascending=False).head(20).sort_values('Valor_Float', ascending=True)
+        
+        fig_cidade = px.bar(df_cidade, x='Valor_Float', y='vtex_cidade', orientation='h', color_discrete_sequence=['#EC4899'])
+        fig_cidade.update_traces(texttemplate='R$ %{x:,.0f}', textposition='outside', hovertemplate='Cidade: %{y}<br>Valor: R$ %{x:,.2f}<extra></extra>')
+        fig_cidade = apply_premium_layout(fig_cidade)
+        fig_cidade.update_layout(xaxis_title="", yaxis_title="", margin=dict(r=50), height=600)
+        st.plotly_chart(fig_cidade, use_container_width=True, config={'displayModeBar': False})
+    else:
+        st.info("Nenhuma cidade rastreada no período selecionado.")
+
 st.markdown("<br><hr style='border-color: #334155;'>", unsafe_allow_html=True)
 
-# ─── Linha 5: Tabela de Dados Brutos ──────────────────────────────────────────
+# ─── Linha 6: Tabela de Dados Brutos ──────────────────────────────────────────
 st.subheader("📋 Detalhamento dos Pedidos Contestados", help="Tabela com o detalhamento das transações que compõem o filtro atual. Útil para auditoria pontual de pedidos e valores.")
 
 # Format columns for display
@@ -542,6 +582,7 @@ preferencias = [
     ('Data_Real', 'Lançamento SAP'),
     ('Data_Venda', 'Data da Venda'),
     ('adyen_vtex_order_id', 'Pedido VTEX'),
+    ('vtex_loja', 'Loja VTEX'),
     ('Categoria SAP', 'Contábil SAP'),
     ('Tipo de Chargeback', 'Classificação Analítica'),
     ('Valor_Float', 'Valor em R$'),
