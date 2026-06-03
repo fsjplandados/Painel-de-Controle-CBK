@@ -46,7 +46,7 @@ def extract_metadata(metadata_str):
 
 def load_sap_data(sap_folder):
     """
-    Carrega todos os arquivos Excel na pasta SAP e filtra por CHARGEBACK na Denominação.
+    Carrega todos os arquivos Excel na pasta SAP.
     """
     print("\n[1/4] Carregando dados do SAP...")
     files = glob.glob(os.path.join(sap_folder, "*.xlsx"))
@@ -69,15 +69,15 @@ def load_sap_data(sap_folder):
                 print(f"    ⚠️ Coluna 'Denominação' não encontrada em {os.path.basename(f)}. Pulando arquivo.")
                 continue
                 
-            # Filtrar apenas linhas contendo CHARGEBACK na Denominação
-            mask = df[denom_col].astype(str).str.upper().str.contains("CHARGEBACK", na=False)
+            # Filtrar apenas linhas que possuem Denominação preenchida
+            mask = df[denom_col].notna()
             df_cb = df[mask].copy()
             
             # Extrair PSP Reference
             df_cb["extracted_psp_ref"] = df_cb[denom_col].apply(extract_psp_ref)
             df_cb["sap_source_file"] = os.path.basename(f)
             
-            print(f"    - Total de Chargebacks extraídos: {len(df_cb)} linhas")
+            print(f"    - Total de Lançamentos extraídos: {len(df_cb)} linhas")
             dfs.append(df_cb)
         except Exception as e:
             print(f"    ❌ Erro ao ler {os.path.basename(f)}: {e}")
@@ -553,7 +553,7 @@ def consolidate_pipeline():
     match_vtex_pct = (match_vtex_count / max(match_adyen_count, 1) * 100) if match_adyen_count > 0 else 0
     
     df_metrics = pd.DataFrame([
-        {"Métrica": "Total de Chargebacks no SAP", "Valor": total_sap},
+        {"Métrica": "Total de Lançamentos no SAP", "Valor": total_sap},
         {"Métrica": "Cruzados com Adyen (Match PSP)", "Valor": match_adyen_count},
         {"Métrica": "Taxa de Cruzamento SAP → Adyen (%)", "Valor": round(match_adyen_pct, 2)},
         {"Métrica": "Cruzados com ClearSale (Match IDs)", "Valor": match_cs_count},

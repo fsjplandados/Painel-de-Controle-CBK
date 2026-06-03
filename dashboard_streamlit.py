@@ -169,10 +169,10 @@ def load_data():
         col_denom = next((c for c in df.columns if 'Denomin' in c and 'objeto' not in c), None)
         if col_denom:
             def categorizar_sap(texto):
-                if pd.isna(texto): return 'Não Identificado'
+                if pd.isna(texto): return 'Outros'
                 t = str(texto).upper().strip()
                 
-                # Regras baseadas no padrão SAP mencionado
+                # Regras baseadas no padrão SAP mencionado e solicitações do usuário
                 if 'RE DISPUTA DE CHARGEBACK' in t:
                     return 'Re-disputa de Chargeback'
                 elif 'REF CREDITO CHARGEBACK' in t or 'REF CRÉDITO CHARGEBACK' in t:
@@ -185,13 +185,24 @@ def load_data():
                     return 'Cashback'
                 elif 'CHARGEBACK' in t:
                     return 'Chargeback'
-                
-                # Fallback genérico: pegar texto antes de hífen ou números (ex: "Chargeback-123")
-                import re
-                parts = re.split(r'[-0-9]', t)
-                if parts and parts[0].strip():
-                    return parts[0].strip().title()
-                return 'Outros Lançamentos'
+                elif 'UBER' in t or 'PERDA UBER' in t:
+                    return 'Uber'
+                elif '99 TÁXI' in t or '99 TAXI' in t or 'PERDA 99' in t:
+                    return '99 Táxi'
+                elif 'IFOOD' in t or 'DESCONTO PGTO IFOOD' in t:
+                    return 'iFood'
+                elif 'TAXA FORA DO PRAZO' in t or 'FORA DO PRAZO ECOMMERCE' in t:
+                    return 'Taxa Fora do Prazo (E-commerce)'
+                elif 'TAXA PIX' in t or 'REF TAXA PIX' in t:
+                    return 'Taxa PIX'
+                elif 'CONTESTAÇÃO NEGADA' in t or 'CONTESTACAO NEGADA' in t:
+                    return 'Contestação Negada'
+                elif 'CANC. TOTAL COM A INSERÇÃO COD. COLETA' in t or 'CANC. TOTAL COM A INSERCAO COD. COLETA' in t or 'COD. COLETA' in t or 'CANCELAMENTO LOGISTICO' in t:
+                    return 'Cancelamento Logístico'
+                elif 'PEDIDO' in t:
+                    return 'Pedidos'
+                else:
+                    return 'Outros'
                 
             df['Categoria SAP'] = df[col_denom].apply(categorizar_sap)
         else:
