@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from statsmodels.tsa.holtwinters import Holt
 
 # ─── Configuração da Página ──────────────────────────────────────────────────
 st.set_page_config(
@@ -133,7 +134,7 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_excel('relatorio_chargeback_consolidado.xlsx', sheet_name='Consolidado Completo', engine='calamine')
+        df = pd.read_excel('relatorio_chargeback_consolidado.xlsx', sheet_name='Consolidado Completo', engine='openpyxl')
         
         # Filtro de Data Preciso
         if 'Data de lançamento' in df.columns:
@@ -417,25 +418,28 @@ def apply_premium_layout(fig):
     fig.update_yaxes(showgrid=True, gridcolor='#1E293B', zeroline=False)
     return fig
 
-# Helper para adicionar linha de tendência futura
+# Helper para adicionar linha de tendência futura com Holt (Suavização Exponencial)
 def add_trendline_with_forecast(fig, df_grouped, x_col, y_col, periods=3):
     # Remover categorias desconhecidas
     df_clean = df_grouped[~df_grouped[x_col].astype(str).str.contains("Desconhecido", case=False, na=False)].copy()
-    if len(df_clean) < 2:
+    if len(df_clean) < 3: # Holt precisa de dados para modelar tendência
         return fig
     
     df_clean = df_clean.sort_values(x_col)
-    
-    x_num = np.arange(len(df_clean))
     y_vals = df_clean[y_col].fillna(0).values
     
-    # Ajuste linear
-    z = np.polyfit(x_num, y_vals, 1)
-    p = np.poly1d(z)
-    
-    # Projetar para o futuro
-    x_future_num = np.arange(len(df_clean) + periods)
-    y_trend = p(x_future_num)
+    try:
+        # Ajuste do Modelo de Holt
+        model = Holt(y_vals, initialization_method="estimated")
+        fit_model = model.fit()
+        
+        # Juntar histórico ajustado + previsão futura
+        y_hist = fit_model.fittedvalues
+        y_pred = fit_model.forecast(periods)
+        y_trend = np.concatenate([y_hist, y_pred])
+    except Exception:
+        # Fallback de segurança se houver poucos dados ou falha de convergência
+        return fig
     
     # Criar labels para o futuro
     last_date_str = df_clean[x_col].iloc[-1]
@@ -447,13 +451,13 @@ def add_trendline_with_forecast(fig, df_grouped, x_col, y_col, periods=3):
         future_dates = [f"Futuro +{i}" for i in range(1, periods + 1)]
         
     all_x = list(df_clean[x_col]) + future_dates
-    y_trend = np.maximum(y_trend, 0) # Evitar valores negativos
+    y_trend = np.maximum(y_trend, 0) # Evitar valores negativos na projeção
     
     fig.add_trace(go.Scatter(
         x=all_x,
         y=y_trend,
         mode='lines+markers',
-        name='Tendência Linear',
+        name='Previsão (Holt)',
         showlegend=False,
         line=dict(color='#F59E0B', width=2, dash='dash'),
         marker=dict(size=6, color='#F59E0B'),
