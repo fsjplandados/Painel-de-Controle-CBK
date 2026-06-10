@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
@@ -233,69 +234,85 @@ if df_raw.empty:
 st.markdown("<h1 style='font-weight: 800; color: #F8FAFC; margin-bottom: 0;'>🛡️ Painel de Controle de Chargebacks</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color: #94A3B8; font-size: 1.05rem; margin-bottom: 1.5rem; font-weight: 400;'>Análise cruzada de Fraude e Desacordos Comerciais.</p>", unsafe_allow_html=True)
 
-# ─── Filtros (Topo da Página) ────────────────────────────────────────────────
-col_header1, col_header2 = st.columns([8, 2])
-with col_header1:
-    st.markdown("<h4 style='color: #EC4899; font-weight: 600; margin-bottom: 0.5rem;'>Filtros de Análise</h4>", unsafe_allow_html=True)
-with col_header2:
-    if st.button("🧹 Limpar Filtros", use_container_width=True):
-        for key in ['filtro_data', 'filtro_adyen', 'filtro_cat_adyen', 'filtro_sap', 'filtro_entrega']:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
+# ─── Filtros (Sidebar) ───────────────────────────────────────────────────────
+st.sidebar.markdown("<h3 style='color: #EC4899; font-weight: 600; margin-bottom: 0.5rem;'>Filtros de Análise</h3>", unsafe_allow_html=True)
 
-col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
+if st.sidebar.button("🧹 Limpar Filtros", use_container_width=True):
+    keys_to_clear = ['filtro_data', 'filtro_adyen', 'filtro_cat_adyen', 'filtro_sap', 'filtro_entrega', 'filtro_uf', 'filtro_cidade', 'filtro_loja']
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.rerun()
 
-with col_f1:
-    min_date = df_raw['Data_Real'].min() if not df_raw['Data_Real'].isna().all() else datetime(2025, 1, 1)
-    max_date = df_raw['Data_Real'].max() if not df_raw['Data_Real'].isna().all() else datetime.today()
-    
-    date_range = st.date_input(
-        "📅 Período (Lançamento):",
-        value=(min_date.date(), max_date.date()),
-        min_value=min_date.date(),
-        max_value=max_date.date(),
-        format="DD/MM/YYYY",
-        key='filtro_data'
-    )
+min_date = df_raw['Data_Real'].min() if not df_raw['Data_Real'].isna().all() else datetime(2025, 1, 1)
+max_date = df_raw['Data_Real'].max() if not df_raw['Data_Real'].isna().all() else datetime.today()
 
-with col_f2:
-    tipos_adyen = sorted(df_raw['adyen_record_type'].unique())
-    tipo_selecionado = st.multiselect(
-        "🏷️ Tipo Adyen:", 
-        options=tipos_adyen,
-        placeholder="Todos (Clique para filtrar)",
-        key='filtro_adyen'
-    )
+date_range = st.sidebar.date_input(
+    "📅 Período (Lançamento):",
+    value=(min_date.date(), max_date.date()),
+    min_value=min_date.date(),
+    max_value=max_date.date(),
+    format="DD/MM/YYYY",
+    key='filtro_data'
+)
 
-with col_f3:
-    tipos_cb = sorted(df_raw['Tipo de Chargeback'].unique())
-    tipo_cb_selecionado = st.multiselect(
-        "🚨 Categoria Adyen:", 
-        options=tipos_cb,
-        placeholder="Todas (Clique para filtrar)",
-        key='filtro_cat_adyen'
-    )
+tipos_adyen = sorted(df_raw['adyen_record_type'].unique())
+tipo_selecionado = st.sidebar.multiselect(
+    "🏷️ Tipo Adyen:", 
+    options=tipos_adyen,
+    placeholder="Todos",
+    key='filtro_adyen'
+)
 
-with col_f4:
-    categorias_sap = sorted(df_raw['Categoria SAP'].unique())
-    default_sap = ['Chargeback'] if 'Chargeback' in categorias_sap else None
-    cat_sap_selecionada = st.multiselect(
-        "📑 SAP:", 
-        options=categorias_sap,
-        default=default_sap,
-        placeholder="Todas (Clique para filtrar)",
-        key='filtro_sap'
-    )
+tipos_cb = sorted(df_raw['Tipo de Chargeback'].unique())
+tipo_cb_selecionado = st.sidebar.multiselect(
+    "🚨 Categoria Adyen:", 
+    options=tipos_cb,
+    placeholder="Todas",
+    key='filtro_cat_adyen'
+)
 
-with col_f5:
-    formas_entrega = sorted([x for x in df_raw['vtex_forma_entrega'].unique() if x != 'Sem Registro' and pd.notna(x)])
-    entrega_selecionada = st.multiselect(
-        "🚚 Forma de Entrega:", 
-        options=formas_entrega,
-        placeholder="Todas",
-        key='filtro_entrega'
-    )
+categorias_sap = sorted(df_raw['Categoria SAP'].unique())
+default_sap = ['Chargeback'] if 'Chargeback' in categorias_sap else None
+cat_sap_selecionada = st.sidebar.multiselect(
+    "📑 SAP:", 
+    options=categorias_sap,
+    default=default_sap,
+    placeholder="Todas",
+    key='filtro_sap'
+)
+
+formas_entrega = sorted([x for x in df_raw['vtex_forma_entrega'].unique() if x != 'Sem Registro' and pd.notna(x)])
+entrega_selecionada = st.sidebar.multiselect(
+    "🚚 Forma de Entrega:", 
+    options=formas_entrega,
+    placeholder="Todas",
+    key='filtro_entrega'
+)
+
+ufs = sorted([x for x in df_raw['vtex_uf'].unique() if x != 'NC' and pd.notna(x)])
+uf_selecionada = st.sidebar.multiselect(
+    "📍 UF:", 
+    options=ufs,
+    placeholder="Todas",
+    key='filtro_uf'
+)
+
+cidades = sorted([x for x in df_raw['vtex_cidade'].unique() if x != 'Sem Registro' and pd.notna(x)])
+cidade_selecionada = st.sidebar.multiselect(
+    "🏙️ Cidade:", 
+    options=cidades,
+    placeholder="Todas",
+    key='filtro_cidade'
+)
+
+lojas = sorted([x for x in df_raw['vtex_loja'].unique() if x != 'Sem Registro' and pd.notna(x)])
+loja_selecionada = st.sidebar.multiselect(
+    "🏪 Loja:", 
+    options=lojas,
+    placeholder="Todas",
+    key='filtro_loja'
+)
 
 # Validação do date_range
 if len(date_range) == 2:
@@ -315,6 +332,12 @@ if cat_sap_selecionada:
     df = df[df['Categoria SAP'].isin(cat_sap_selecionada)]
 if entrega_selecionada:
     df = df[df['vtex_forma_entrega'].isin(entrega_selecionada)]
+if uf_selecionada:
+    df = df[df['vtex_uf'].isin(uf_selecionada)]
+if cidade_selecionada:
+    df = df[df['vtex_cidade'].isin(cidade_selecionada)]
+if loja_selecionada:
+    df = df[df['vtex_loja'].isin(loja_selecionada)]
 
 # Helpers de Formatação
 def fmt_currency(val):
@@ -394,6 +417,50 @@ def apply_premium_layout(fig):
     fig.update_yaxes(showgrid=True, gridcolor='#1E293B', zeroline=False)
     return fig
 
+# Helper para adicionar linha de tendência futura
+def add_trendline_with_forecast(fig, df_grouped, x_col, y_col, periods=3):
+    # Remover categorias desconhecidas
+    df_clean = df_grouped[~df_grouped[x_col].astype(str).str.contains("Desconhecido", case=False, na=False)].copy()
+    if len(df_clean) < 2:
+        return fig
+    
+    df_clean = df_clean.sort_values(x_col)
+    
+    x_num = np.arange(len(df_clean))
+    y_vals = df_clean[y_col].fillna(0).values
+    
+    # Ajuste linear
+    z = np.polyfit(x_num, y_vals, 1)
+    p = np.poly1d(z)
+    
+    # Projetar para o futuro
+    x_future_num = np.arange(len(df_clean) + periods)
+    y_trend = p(x_future_num)
+    
+    # Criar labels para o futuro
+    last_date_str = df_clean[x_col].iloc[-1]
+    
+    try:
+        last_date = pd.to_datetime(last_date_str, format='%Y-%m')
+        future_dates = [(last_date + pd.DateOffset(months=i)).strftime('%Y-%m') for i in range(1, periods + 1)]
+    except:
+        future_dates = [f"Futuro +{i}" for i in range(1, periods + 1)]
+        
+    all_x = list(df_clean[x_col]) + future_dates
+    y_trend = np.maximum(y_trend, 0) # Evitar valores negativos
+    
+    fig.add_trace(go.Scatter(
+        x=all_x,
+        y=y_trend,
+        mode='lines+markers',
+        name='Tendência Linear',
+        showlegend=False,
+        line=dict(color='#F59E0B', width=2, dash='dash'),
+        marker=dict(size=6, color='#F59E0B'),
+        hovertemplate='Mês: %{x}<br>Tendência: R$ %{y:,.2f}<extra></extra>'
+    ))
+    return fig
+
 # ─── Linha 1: Gráficos de Evolução (Lançamento vs Venda) ─────────────────────────────
 col_evol1, col_evol2 = st.columns(2)
 
@@ -404,6 +471,7 @@ with col_evol1:
         fig_evol = px.bar(df_evol, x='Data_MesAno', y='Valor_Float',
                           color_discrete_sequence=['#818CF8'])
         fig_evol.update_traces(hovertemplate='Lançamento: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
+        fig_evol = add_trendline_with_forecast(fig_evol, df_evol, 'Data_MesAno', 'Valor_Float', periods=3)
         fig_evol = apply_premium_layout(fig_evol)
         fig_evol.update_xaxes(type='category')
         fig_evol.update_layout(xaxis_title="", yaxis_title="")
@@ -419,6 +487,7 @@ with col_evol2:
         fig_venda = px.bar(df_venda, x='Data_Venda_MesAno', y='Valor_Float',
                            color_discrete_sequence=['#818CF8'])
         fig_venda.update_traces(hovertemplate='Venda Origem: %{x}<br>Valor: R$ %{y:,.2f}<extra></extra>')
+        fig_venda = add_trendline_with_forecast(fig_venda, df_venda, 'Data_Venda_MesAno', 'Valor_Float', periods=3)
         fig_venda = apply_premium_layout(fig_venda)
         fig_venda.update_xaxes(type='category')
         fig_venda.update_layout(xaxis_title="", yaxis_title="")
